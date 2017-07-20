@@ -88,11 +88,171 @@ public class MainWorker implements Runnable, ThreadWatcher, Watchable {
 		this.logPan = logPane;
 		this.folder = folder;
 		FailTracker.putToZero();
-		if (SessionCfg.getSdk() > 20) {
+		if(SessionCfg.getSdk() >= 24){
+			initN();
+		} else if (SessionCfg.getSdk() > 20) {
 			init();
 		} else {
 			initLegacy();
 		}
+
+	}
+
+	private void initN() {
+		// TODO Auto-generated method stub
+		// lets unsquash this bitch !
+		if (SessionCfg.isSquash) {
+			boolean unsquash = UnsquashUtils.unsquash(folder);
+			if (!unsquash) {
+				this.logPan.addLog(R.getString(S.LOG_ERROR) + R.getString("0000141"));
+				this.threadWatcher.sendFailed(this);
+				isinitialized = false;
+				return;
+			} else {
+				new File(folder.getAbsolutePath() + File.separator + "odex.app.sqsh").delete();
+				new File(folder.getAbsolutePath() + File.separator + "odex.priv-app.sqsh").delete();
+				new File(folder.getAbsolutePath() + File.separator + "odex.framework.sqsh").delete();
+			}
+		}
+
+		// unsquash first !
+		try {
+			ArrayList<File> boot = FilesUtils.searchExactFileNames(
+					new File(folder.getAbsolutePath() + File.separator + S.SYSTEM_FRAMEWORK), "boot.oat");
+			SessionCfg.setBootOatFile(boot.get(0));
+			isinitialized = FilesUtils.copyFile(SessionCfg.getBootOatFile(), S.getBootTmp());
+			if (!isinitialized) {
+				this.threadWatcher.sendFailed(this);
+				this.logPan.addLog(R.getString(S.LOG_ERROR) + R.getString("0000139"));
+				return;
+			}
+		} catch (Exception e) {
+			Logger.appendLog("[MainWorker][EX]" + e.getStackTrace());
+
+		}
+		// Start here 
+		isinitialized = isinitialized && Deodexer.oat2dexBootN(S.getBootTmp());
+		if (!isinitialized) {
+			this.logPan.addLog(R.getString(S.LOG_ERROR) + R.getString("0000140"));
+			this.threadWatcher.sendFailed(this);
+			return;
+		}
+
+		/// Let's do all the oatFiles TODO
+		File framework = new File(folder.getAbsolutePath() + File.separator + S.SYSTEM_FRAMEWORK);
+		ArrayList<File> oatFiles = new ArrayList<File>();
+		// TODO remove hard coded ext maybe there is compressed ones 
+		//oatFiles.addAll(FilesUtils.searchrecursively(framework, ".oat"));
+		ArrayList<File> allOats = FilesUtils.searchrecursively(framework, ".oat");
+		for (File file : allOats) {
+			if(!file.getName().equals("boot.oat")){
+				oatFiles.add(file);
+			}
+		}
+		oatFiles = ArrayUtils.deletedupricates(oatFiles);
+		for (File oat : oatFiles) {
+			// let's corppy them to 
+			File tmpOat = new File(S.getBootTmp().getAbsolutePath().substring(0, S.getBootTmp().getAbsolutePath().lastIndexOf(File.separator))+File.separator+oat.getName());
+			isinitialized = FilesUtils.copyFile(oat,tmpOat);
+			isinitialized = Deodexer.DeodexOatN(tmpOat);
+		}
+		if (!isinitialized) {
+			this.logPan.addLog(R.getString(S.LOG_ERROR) + R.getString("0000140"));
+			this.threadWatcher.sendFailed(this);
+			return;
+		}
+		
+		File bootFiles = new File(S.getBootTmpDex().getAbsolutePath());
+
+		
+		worker1List = this.getapkOdexFiles();
+
+		int half = worker1List.size() / 2;
+		worker2List = new ArrayList<File>();
+		for (int i = worker1List.size() - 1; i >= half; i = worker1List.size() - 1) {
+			worker2List.add(worker1List.get(i));
+			worker1List.remove(i);
+		}
+
+		/// framework
+		framework = new File(folder.getAbsolutePath() + File.separator + S.SYSTEM_FRAMEWORK);
+		this.worker3List = new ArrayList<File>();
+		for (String ext : exts) {
+			this.worker3List.addAll(FilesUtils.searchrecursively(framework, ext));
+		}
+
+		this.worker3List = ArrayUtils.deletedupricates(this.worker3List);
+		// some roms have apks under framwork like LG roms
+		ArrayList<File> temapkinfram = new ArrayList<File>();
+		for (File f : this.worker3List) {
+			ArrayList<File> apksInFram = ArrayUtils.deletedupricates(FilesUtils.searchExactFileNames(
+					new File(folder.getAbsolutePath() + File.separator + S.SYSTEM_FRAMEWORK),
+					f.getName().substring(0, f.getName().lastIndexOf(".")) + ".apk"));
+
+			Logger.appendLog("[MainWorker][I]" + "Searching for ");
+			if (!apksInFram.isEmpty() && FilesUtils
+					.searchExactFileNames(new File(folder.getAbsolutePath() + File.separator + S.SYSTEM_FRAMEWORK),
+							f.getName().substring(0, f.getName().lastIndexOf(".")) + ".jar")
+					.isEmpty()) {
+				temapkinfram.add(f);
+				Logger.appendLog("[MainWorker][I]" + "Found moving it to apk worker's list ");
+				// this.worker3List.remove(f);
+			} else {
+				Logger.appendLog("[MainWorker][I]" + "Not found assuming odex file belongs to a .jar file ...");
+			}
+		}
+		temapkinfram = ArrayUtils.deletedupricates(temapkinfram);
+		this.worker1List.addAll(temapkinfram);
+		this.worker3List.removeAll(temapkinfram);
+		if(!this.otherJars.isEmpty()){
+			this.worker3List.addAll(otherJars);
+		}
+		apk1 = new ApkWorker(worker1List, logPan, S.getWorker1Folder(), SessionCfg.isSign(), SessionCfg.isZipalign());
+		apk2 = new ApkWorker(worker2List, logPan, S.getWorker2Folder(), SessionCfg.isSign(), SessionCfg.isZipalign());
+		jar = new JarWorker(worker3List, logPan, S.getWorker3Folder());
+
+		// bootFile
+		File[] boots = bootFiles.listFiles();
+		worker4List = new ArrayList<File>();
+		for (File f : boots) {
+			if (!f.getName().endsWith(S.CLASSES_2) && !f.getName().endsWith(S.CLASSES_3)) {
+				if (f.getName().endsWith(".dex")) {
+					worker4List.add(f);
+				}
+			}
+		}
+		boot = new BootWorker(worker4List, S.getWorker4Folder(), this.logPan);
+
+		Logger.appendLog("[MainWorker][I]" + "APK list 1");
+		for (File f : this.worker1List) {
+			Logger.appendLog("[MainWorker][I]" + f.getAbsolutePath());
+		}
+		Logger.appendLog("[MainWorker][I]" + "APK list 2");
+		for (File f : this.worker2List) {
+			Logger.appendLog("[MainWorker][I]" + f.getAbsolutePath());
+		}
+		Logger.appendLog("[MainWorker][I]" + "Jar list 3");
+		for (File f : this.worker3List) {
+			Logger.appendLog("[MainWorker][I]" + f.getAbsolutePath());
+		}
+		Logger.appendLog("[MainWorker][I]" + "boot list 4 (boot)");
+		for (File f : this.worker4List) {
+			Logger.appendLog("[MainWorker][I]" + f.getAbsolutePath());
+		}
+
+		apk1.addThreadWatcher(this);
+		apk2.addThreadWatcher(this);
+		boot.addThreadWatcher(this);
+		jar.addThreadWatcher(this);
+		tasks.add(apk1);
+		tasks.add(apk2);
+		tasks.add(jar);
+		tasks.add(boot);
+		// FIXME : this should not be initialized on command line worker
+		// because it's useless ! don't just add a condition here otherwise
+		// all set and get progress will throw nullpointer exception
+		// do this on a clear head
+		this.initPannel();
 
 	}
 

@@ -29,9 +29,11 @@ public class Test {
 
 	public static void main(String[] args) throws IOException {
 		// just for testing purpose
-		ArrayList<File> failSafeOat2dex = ArrayUtils.deletedupricates(FilesUtils.searchrecursively(S.OAT2DEX_FAILSAFE_PATH, ".jar"));
-		for (File f : failSafeOat2dex){
-			System.out.println(f);
-		}
+		//ArrayList<File> failSafeOat2dex = ArrayUtils.deletedupricates(FilesUtils.searchrecursively(S.OAT2DEX_FAILSAFE_PATH, ".jar"));
+		//for (File f : failSafeOat2dex){
+		//	System.out.println(f);
+		//}
+		String str = "servise.oat";
+		System.out.println(str.substring(0, str.lastIndexOf(".")));
 	}
 }

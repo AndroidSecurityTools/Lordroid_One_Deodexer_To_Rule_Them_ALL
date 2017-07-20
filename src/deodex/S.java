@@ -108,6 +108,11 @@ public class S {
 	private static final String OAT2DEX_JAR = PathUtils.getExcutionPath() + File.separator + "bins/oat2dex/oat2dex.jar";
 	private static final String BACKSMALI_JAR = PathUtils.getExcutionPath() + File.separator
 			+ "bins/smali_backsmali/baksmali.jar";
+	private static final String OAT2DEX_JAR_N = PathUtils.getExcutionPath() + File.separator + "bins/oat2dex/7.0/oat2dex.jar";
+	private static final String BACKSMALI_JAR_N = PathUtils.getExcutionPath() + File.separator
+			+ "bins/smali_backsmali/7.0/baksmali.jar";
+	private static final String SMALI_JAR_N = PathUtils.getExcutionPath() + File.separator
+			+ "bins/smali_backsmali/7.0/smali.jar";
 
 	private static final String UNSQUASH_WIN = new File(
 			PathUtils.getExcutionPath() + File.separator + "bins/native/squashfs/unsquashfs").getAbsolutePath();
@@ -307,7 +312,7 @@ public class S {
 		bootTmp = new File(tempFolder.getAbsolutePath() + File.separator + TMP_SFX + File.separator + "boot"
 				+ File.separator + "boot.oat");
 		bootTmpDex = new File(tempFolder.getAbsolutePath() + File.separator + TMP_SFX + File.separator + "boot"
-				+ File.separator + "dex");
+				+ File.separator + "odex");
 		unsquash = new File(tempFolder.getAbsolutePath() + File.separator + TMP_SFX + File.separator + "unsquash");
 		File temp = worker1Folder.getParentFile();
 		if (temp.exists()) {
@@ -323,5 +328,26 @@ public class S {
 
 	public static void setTempDir(String path) {
 		S.setTempDir(new File(path));
+	}
+
+	/**
+	 * @return the oat2dexJarN
+	 */
+	public static String getOat2dexJarN() {
+		return OAT2DEX_JAR_N;
+	}
+
+	/**
+	 * @return the backsmaliJarN
+	 */
+	public static String getBacksmaliJarN() {
+		return BACKSMALI_JAR_N;
+	}
+
+	/**
+	 * @return the smaliJarN
+	 */
+	public static String getSmaliJarN() {
+		return SMALI_JAR_N;
 	}
 }

@@ -43,7 +43,13 @@ public class Deodexer {
 	 * @return true only if the odex was deodexed
 	 */
 	public static boolean deodexApk(File odexFile, File dexFile) {
-		String cmd[] = { "java", Cfg.getMaxHeadSizeArg(), "-jar", S.getAot2Dex(), odexFile.getAbsolutePath(),
+		String oat2dexJar;
+		if(SessionCfg.getSdk() >= 24) {
+			oat2dexJar = S.getOat2dexJarN();
+		} else {
+			oat2dexJar = S.getAot2Dex();
+		}
+		String cmd[] = { "java", Cfg.getMaxHeadSizeArg(), "-jar", oat2dexJar, odexFile.getAbsolutePath(),
 				S.getBootTmpDex().getAbsolutePath() };
 		CmdUtils.runCommand(cmd);
 		if (dexFile.exists()){
@@ -149,13 +155,24 @@ public class Deodexer {
 		return oat2dexBootCmdWay(bootOat);
 	}
 
+	
+	public static boolean oat2dexBootN(File bootOat) {
+		Logger.appendLog("[Deodexer][I] trying to de-optimize boot.oat using oat2dex as binary ....");
+		String[] cmd1 = { "java", Cfg.getMaxHeadSizeArg(), "-jar", S.getOat2dexJarN(), "boot", bootOat.getAbsolutePath() };
+		CmdUtils.runCommand(cmd1);
+
+		return S.getBootTmpDex().exists() && S.getBootTmpDex().listFiles().length > 0;
+		
+	}
+	
+	
+	
 	/**
 	 * 
 	 * @param bootOat
 	 * @return true only id the dex boot folder was created
 	 */
 	public static boolean oat2dexBootCmdWay(File bootOat) {
-		Logger.appendLog("[Deodexer][E] de-optimize boot.oat using oat2dex as library ...." + "[failed]");
 		Logger.appendLog("[Deodexer][I] trying to de-optimize boot.oat using oat2dex as binary ....");
 		String[] cmd1 = { "java", Cfg.getMaxHeadSizeArg(), "-jar", S.getAot2Dex(), "boot", bootOat.getAbsolutePath() };
 		CmdUtils.runCommand(cmd1);
@@ -179,6 +196,16 @@ public class Deodexer {
 		CmdUtils.runCommand(cmd);
 
 		return out.exists();
+	}
+
+	public static boolean DeodexOatN(File oat) {
+		// TODO Auto-generated method stub
+		String[] cmd = {"java","-jar",S.getOat2dexJarN(),"odex",oat.getAbsolutePath()};
+		CmdUtils.runCommand(cmd);
+		String oatName = oat.getName().substring(0, oat.getName().lastIndexOf("."))+".dex";
+		File dexFile =  new File(oat.getAbsolutePath().substring(0, oat.getAbsolutePath().lastIndexOf(File.separator))+File.separator+"odex"+File.separator+oatName);
+		Logger.appendLog("Checking if "+dexFile.getAbsolutePath()+" exists : "+dexFile.exists());
+		return true;	
 	}
 
 }
